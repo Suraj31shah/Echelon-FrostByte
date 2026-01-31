@@ -46,6 +46,17 @@ class DeepfakeDetector:
             # Simple Root Mean Square (RMS) calculation
             energy = float(np.mean(audio_buffer**2)) * 1000 
             
+            # --- SILENCE FILTER ---
+            # If audio is too quiet, it's not a deepfake, it's just silence.
+            # Prevents model from hallucinating on background hiss.
+            if energy < 5.0:
+                 return {
+                    "label": "REAL",
+                    "confidence": 0.0,
+                    "energy": round(energy, 4),
+                    "artifacts": 0.0
+                }
+
             # 2. AI Inference
             spec_tensor = extract_log_mel_spectrogram(audio_buffer).unsqueeze(0).to(self.device)
             
@@ -54,7 +65,9 @@ class DeepfakeDetector:
                 probs = torch.nn.functional.softmax(logits, dim=1)
                 fake_score = probs[0][1].item()
             
-            label = "FAKE" if fake_score > 0.5 else "REAL"
+            # --- THRESHOLD TUNING ---
+            # Increased to 0.70 to reduce false positives on raw WebRTC audio
+            label = "FAKE" if fake_score > 0.70 else "REAL"
             
             return {
                 "label": label,

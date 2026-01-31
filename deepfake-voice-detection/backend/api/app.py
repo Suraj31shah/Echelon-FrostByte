@@ -34,6 +34,20 @@ async def audio_socket(websocket: WebSocket):
     # This invokes the handler in websockets.py which does the actual accept()
     await websocket_endpoint(websocket)
 
+from realtime.realtime_call_ws import websocket_call_endpoint
+
+@app.websocket("/ws/call/{room_id}")
+async def call_socket(websocket: WebSocket, room_id: str, sample_rate: int = 16000):
+    try:
+        await websocket_call_endpoint(websocket, room_id, sample_rate)
+    except Exception as e:
+        print(f"🔥 CALL WORKER ERROR: {e}")
+        # Try to close if not already closed
+        try:
+            await websocket.close(code=1011)
+        except:
+            pass
+
 @app.post("/analyze-file")
 async def analyze_file(file: UploadFile = File(...)):
     try:

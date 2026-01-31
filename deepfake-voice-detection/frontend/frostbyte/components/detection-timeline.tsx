@@ -1,8 +1,22 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
-export function DetectionTimeline() {
+interface TimelineProps {
+    history: number[]; // 0 for Real, 1 for Fake
+}
+
+export function DetectionTimeline({ history }: TimelineProps) {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) {
+        return null; // or a skeleton loading state
+    }
     // Mock data for the timeline
     const timelineData = Array.from({ length: 20 }, (_, i) => ({
         id: i,

@@ -1,16 +1,22 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { WebRTCCallManager, CallState } from "../lib/webrtcCall";
 
 export default function LiveCallStreamer() {
-  const [mode, setMode] = useState<"live" | "upload">("live");
+  const [mode, setMode] = useState<"live" | "upload" | "call">("live");
   const [isRecording, setIsRecording] = useState(false);
   const [status, setStatus] = useState("Idle");
-  
+
+  // CALL SPECIFIC STATE
+  const [roomId, setRoomId] = useState("");
+  const [callState, setCallState] = useState<CallState>("idle");
+  const callManagerRef = useRef<WebRTCCallManager | null>(null);
+
   // METRICS
   const [finalVerdict, setFinalVerdict] = useState<{ label: string; confidence: number } | null>(null);
   const [liveData, setLiveData] = useState({ label: "--", confidence: 0, energy: 0, artifacts: 0 });
-  
-  // REFS
+
+  // REFS (Legacy Safe Mode)
   const socketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
@@ -44,6 +50,7 @@ export default function LiveCallStreamer() {
     } catch (err) { console.error(err); setStatus("Error: Upload Failed"); }
   };
 
+  // --- LEGACY LIVE STREAM ---
   const startStream = async () => {
     setFinalVerdict(null);
     setLiveData({ label: "--", confidence: 0, energy: 0, artifacts: 0 });
@@ -54,17 +61,17 @@ export default function LiveCallStreamer() {
 
       setStatus("Connecting...");
       socketRef.current = new WebSocket("ws://localhost:8000/ws/audio");
-      
+
       socketRef.current.onopen = async () => {
         setStatus("Connected! Initializing Audio...");
-        
+
         // 1. Create Context (Browser decides Sample Rate)
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         audioContextRef.current = new AudioContextClass();
-        
+
         // 2. Resume if suspended
         if (audioContextRef.current.state === "suspended") {
-            await audioContextRef.current.resume();
+          await audioContextRef.current.resume();
         }
 
         const inputRate = audioContextRef.current.sampleRate;
@@ -72,14 +79,14 @@ export default function LiveCallStreamer() {
 
         sourceRef.current = audioContextRef.current.createMediaStreamSource(stream);
         processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
-        
+
         processorRef.current.onaudioprocess = (e) => {
           if (socketRef.current?.readyState === WebSocket.OPEN) {
             const rawData = e.inputBuffer.getChannelData(0);
-            
+
             // ⚡ FIX: DOWNSAMPLE TO 16000HZ
             const finalData = downsampleBuffer(rawData, inputRate, 16000);
-            
+
             socketRef.current.send(finalData.buffer);
           }
         };
@@ -89,17 +96,17 @@ export default function LiveCallStreamer() {
         setIsRecording(true);
         setStatus("Monitoring Live Audio...");
       };
-      
+
       socketRef.current.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.status === "processing") {
-            // Update Real-Time Stats
-            setLiveData({
-                label: data.live_label,
-                confidence: data.live_confidence,
-                energy: data.energy,
-                artifacts: data.artifacts
-            });
+          // Update Real-Time Stats
+          setLiveData({
+            label: data.live_label,
+            confidence: data.live_confidence,
+            energy: data.energy,
+            artifacts: data.artifacts
+          });
         }
         else if (data.status === "complete") {
           setFinalVerdict({ label: data.label, confidence: data.confidence });
@@ -124,60 +131,93 @@ export default function LiveCallStreamer() {
     audioContextRef.current?.close();
   };
 
+  // --- CALL HANDLERS ---
+  const startCall = async () => {
+    if (!roomId) return alert("Please enter a Room ID");
+
+    setFinalVerdict(null);
+    setLiveData({ label: "--", confidence: 0, energy: 0, artifacts: 0 });
+
+    callManagerRef.current = new WebRTCCallManager(
+      (newState) => {
+        setCallState(newState);
+        setStatus(`Call Status: ${newState.toUpperCase()}`);
+      },
+      (result) => {
+        setLiveData({
+          label: result.label,
+          confidence: result.confidence,
+          energy: result.energy,
+          artifacts: result.confidence * 10 // Approximation based on confidence
+        });
+      }
+    );
+
+    await callManagerRef.current.joinRoom(roomId);
+  };
+
+  const endCall = () => {
+    callManagerRef.current?.cleanup();
+    setCallState("ended");
+    setStatus("Call Ended");
+  };
+
   // --- UI COMPONENTS ---
   return (
     <div className="p-6 border border-gray-700 rounded-xl bg-gray-900/50 text-white max-w-2xl mx-auto backdrop-blur-sm">
       <div className="flex justify-center gap-4 mb-6">
         <button onClick={() => setMode("live")} className={`px-4 py-2 rounded-lg font-bold ${mode === "live" ? "bg-cyan-600" : "bg-gray-800 text-gray-400"}`}>Live Monitor</button>
+        <button onClick={() => setMode("call")} className={`px-4 py-2 rounded-lg font-bold ${mode === "call" ? "bg-cyan-600" : "bg-gray-800 text-gray-400"}`}>P2P Call</button>
         <button onClick={() => setMode("upload")} className={`px-4 py-2 rounded-lg font-bold ${mode === "upload" ? "bg-cyan-600" : "bg-gray-800 text-gray-400"}`}>File Upload</button>
       </div>
 
-      {/* --- LIVE STATS DASHBOARD --- */}
-      {mode === "live" && isRecording && (
+      {/* --- LIVE STATS DASHBOARD (Shared for Live & Call) --- */}
+      {((mode === "live" && isRecording) || (mode === "call" && callState === "connected")) && (
         <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="p-4 bg-gray-800 rounded-lg text-center border border-gray-600">
-                <div className="text-gray-400 text-xs uppercase">Current Fragment</div>
-                <div className={`text-2xl font-bold ${liveData.label === "FAKE" ? "text-red-500" : "text-green-500"}`}>
-                    {liveData.label}
-                </div>
+          <div className="p-4 bg-gray-800 rounded-lg text-center border border-gray-600">
+            <div className="text-gray-400 text-xs uppercase">Current Fragment</div>
+            <div className={`text-2xl font-bold ${liveData.label === "FAKE" ? "text-red-500" : "text-green-500"}`}>
+              {liveData.label}
             </div>
-            <div className="p-4 bg-gray-800 rounded-lg border border-gray-600">
-                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                    <span>Artifact Level</span>
-                    <span>{liveData.artifacts}</span>
-                </div>
-                {/* Artifact Bar */}
-                <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
-                    <div 
-                        className="bg-red-500 h-full transition-all duration-300" 
-                        style={{ width: `${Math.min(liveData.artifacts * 10, 100)}%` }} 
-                    />
-                </div>
-                
-                <div className="flex justify-between text-xs text-gray-400 mt-3 mb-1">
-                    <span>Voice Energy</span>
-                    <span>{liveData.energy.toFixed(1)}</span>
-                </div>
-                {/* Energy Bar */}
-                <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
-                    <div 
-                        className="bg-cyan-400 h-full transition-all duration-100" 
-                        style={{ width: `${Math.min(liveData.energy * 20, 100)}%` }} 
-                    />
-                </div>
+          </div>
+          <div className="p-4 bg-gray-800 rounded-lg border border-gray-600">
+            <div className="flex justify-between text-xs text-gray-400 mb-1">
+              <span>Artifact Level</span>
+              <span>{liveData.artifacts.toFixed(1)}</span>
             </div>
+            {/* Artifact Bar */}
+            <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
+              <div
+                className="bg-red-500 h-full transition-all duration-300"
+                style={{ width: `${Math.min(liveData.artifacts * 10, 100)}%` }}
+              />
+            </div>
+
+            <div className="flex justify-between text-xs text-gray-400 mt-3 mb-1">
+              <span>Voice Energy</span>
+              <span>{liveData.energy.toFixed(1)}</span>
+            </div>
+            {/* Energy Bar */}
+            <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
+              <div
+                className="bg-cyan-400 h-full transition-all duration-100"
+                style={{ width: `${Math.min(liveData.energy * 20, 100)}%` }}
+              />
+            </div>
+          </div>
         </div>
       )}
 
       {/* --- MAIN VERDICT DISPLAY --- */}
       <div className={`h-32 flex flex-col items-center justify-center rounded-lg mb-6 transition-all duration-500
-        ${finalVerdict 
-            ? (finalVerdict.label === "FAKE" ? "bg-red-500/20 border-2 border-red-500" : "bg-green-500/20 border-2 border-green-500") 
-            : "bg-gray-800 border-2 border-gray-700"}`}>
-        
+        ${finalVerdict
+          ? (finalVerdict.label === "FAKE" ? "bg-red-500/20 border-2 border-red-500" : "bg-green-500/20 border-2 border-green-500")
+          : "bg-gray-800 border-2 border-gray-700"}`}>
+
         {!finalVerdict ? (
           <div className="flex flex-col items-center">
             <div className="text-gray-400 animate-pulse text-lg font-mono mb-2">{status}</div>
+            {mode === "call" && callState === "connected" && <div className="text-cyan-400 text-sm">Secure Line Active</div>}
           </div>
         ) : (
           <>
@@ -197,12 +237,27 @@ export default function LiveCallStreamer() {
         ) : (
           <button onClick={requestStop} className="w-full bg-red-600 hover:bg-red-500 text-white py-4 rounded-lg font-bold text-lg animate-pulse">STOP & GENERATE REPORT</button>
         )
+      ) : mode === "call" ? (
+        callState !== "connected" && callState !== "joining" ? (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Enter Room ID"
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value)}
+              className="flex-1 bg-gray-800 text-white px-4 rounded-lg outline-none border border-gray-600 focus:border-cyan-500"
+            />
+            <button onClick={startCall} className="w-1/3 bg-cyan-600 hover:bg-cyan-500 text-white py-4 rounded-lg font-bold text-lg shadow-lg">JOIN CALL</button>
+          </div>
+        ) : (
+          <button onClick={endCall} className="w-full bg-red-600 hover:bg-red-500 text-white py-4 rounded-lg font-bold text-lg">END CALL</button>
+        )
       ) : (
         <div className="relative w-full">
-            <input type="file" accept=".wav,.mp3" onChange={handleFileUpload} className="hidden" id="file-upload" />
-            <label htmlFor="file-upload" className="w-full flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-white py-4 rounded-lg font-bold text-lg cursor-pointer border-2 border-dashed border-gray-500">
-                Select Forensic Audio File
-            </label>
+          <input type="file" accept=".wav,.mp3" onChange={handleFileUpload} className="hidden" id="file-upload" />
+          <label htmlFor="file-upload" className="w-full flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-white py-4 rounded-lg font-bold text-lg cursor-pointer border-2 border-dashed border-gray-500">
+            Select Forensic Audio File
+          </label>
         </div>
       )}
     </div>
