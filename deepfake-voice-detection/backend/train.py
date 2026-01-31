@@ -20,7 +20,7 @@ except ImportError:
 # --- CONFIGURATION ---
 DATA_DIR = "data"     # Folder containing 'real' and 'fake' subfolders
 BATCH_SIZE = 16       # Reduce to 8 if you run out of Memory
-EPOCHS = 5            # 5 Epochs is usually enough for a Hackathon demo
+EPOCHS = 5            # 5 Epochs is usually enough f    or a Hackathon demo
 LR = 0.001            # Learning Rate
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
