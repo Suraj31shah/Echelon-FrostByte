@@ -12,3 +12,4 @@ webrtcvad-wheels
 python-multipart
 scikit-learn
 requests
+kagglehub

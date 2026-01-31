@@ -4,10 +4,9 @@ from api.websockets import websocket_endpoint
 
 app = FastAPI()
 
-# Allow Next.js to connect
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, change to your Next.js URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

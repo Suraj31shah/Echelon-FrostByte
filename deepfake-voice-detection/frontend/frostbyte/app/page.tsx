@@ -1,5 +1,5 @@
 import { HeroSection } from "@/components/hero-section";
-import { LiveDetectionPanel } from "@/components/voice-detection-panel";
+import LiveCallStreamer from "@/components/LiveCallStreamer";
 import { DetectionTimeline } from "@/components/detection-timeline";
 import { SystemStrengths } from "@/components/system-strengths";
 
@@ -9,8 +9,21 @@ export default function Home() {
       <HeroSection />
 
       <div className="w-full bg-gradient-to-b from-background to-panel/50 pt-10 pb-20">
-        <div id="detection-panel" className="scroll-mt-20">
-          <LiveDetectionPanel />
+        <div id="detection-panel" className="scroll-mt-20 container mx-auto px-4">
+          
+          {/* Header for the section */}
+          <div className="mb-10 text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Live Voice Analysis
+            </h2>
+            <p className="mt-4 text-lg text-gray-400">
+              Test the system in real-time. Start the simulation and speak into your microphone.
+            </p>
+          </div>
+
+          {/* THE WORKING COMPONENT IS HERE */}
+          <LiveCallStreamer /> 
+          
         </div>
 
         <DetectionTimeline />
