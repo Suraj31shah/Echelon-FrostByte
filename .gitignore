@@ -18,12 +18,12 @@ venv/
 .ipynb_checkpoints/
 *.ipynb~
 
-# ==============================
-# Data (DO NOT COMMIT DATASETS)
-# ==============================
-data/raw/
-data/processed/
-data/metadata/*.csv
+# # ==============================
+# # Data (DO NOT COMMIT DATASETS)
+# # ==============================
+# data/raw/
+# data/processed/
+# data/metadata/*.csv
 
 # ==============================
 # Model Files
