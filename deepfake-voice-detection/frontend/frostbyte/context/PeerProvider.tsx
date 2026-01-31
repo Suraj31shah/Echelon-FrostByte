@@ -6,6 +6,7 @@ interface PeerContextType {
     localStream: MediaStream | null;
     peers: Record<string, RTCPeerConnection>; // Map peerId -> RTCPeerConnection
     remoteStreams: Record<string, MediaStream>; // Map peerId -> MediaStream
+    peerStates: Record<string, string>; // Map peerId -> connectionState
     joinChannel: (channel: string, userdata: any) => void;
     leaveChannel: (channel: string) => void;
     reset: () => void;
@@ -20,6 +21,7 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [peers, setPeers] = useState<Record<string, RTCPeerConnection>>({});
     const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+    const [peerStates, setPeerStates] = useState<Record<string, string>>({});
 
     // Refs to access latest state in callbacks/effects without triggering re-runs
     const peersRef = useRef<Record<string, RTCPeerConnection>>({});
@@ -34,7 +36,7 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
     useEffect(() => {
         const initMedia = async () => {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                 setLocalStream(stream);
                 localStreamRef.current = stream;
             } catch (err) {
@@ -202,6 +204,7 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
             localStream,
             peers,
             remoteStreams,
+            peerStates,
             joinChannel,
             leaveChannel,
             reset
