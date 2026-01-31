@@ -112,7 +112,7 @@ export default function WebRTCCall() {
           console.error("Connection error:", error);
           setConnectionStatus("disconnected");
           setConnectionError(`Failed to connect: ${error.message}`);
-          
+
           // If using ngrok or external URL, provide helpful message
           if (SIGNALING_URL.includes("ngrok") || SIGNALING_URL.includes("http://") && !SIGNALING_URL.includes("localhost")) {
             setConnectionError("Cannot connect to server. Check if ngrok tunnel is active and URL is correct.");
@@ -289,71 +289,78 @@ export default function WebRTCCall() {
   };
 
   const startAudioRecording = (stream: MediaStream, callId: string) => {
-    const options = { mimeType: "audio/webm;codecs=opus" };
-    const mediaRecorder = new MediaRecorder(stream, options);
+    // mimeType check
+    let mimeType = "audio/webm;codecs=opus";
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = "audio/webm";
+    }
+
+    const mediaRecorder = new MediaRecorder(stream, { mimeType });
     mediaRecorderRef.current = mediaRecorder;
 
-    let chunkStartTime = Date.now();
-    const CHUNK_DURATION_MS = 10000; // 10 seconds
-
-    mediaRecorder.ondataavailable = async (event) => {
+    mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         audioChunksRef.current.push(event.data);
-
-        // Check if we've accumulated 10 seconds
-        const elapsed = Date.now() - chunkStartTime;
-        if (elapsed >= CHUNK_DURATION_MS) {
-          // Create audio chunk object
-          const chunkBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-          const chunkUrl = URL.createObjectURL(chunkBlob);
-          
-          const audioChunk: AudioChunk = {
-            id: `chunk_${chunkIndexRef.current}_${Date.now()}`,
-            timestamp: new Date(),
-            blob: chunkBlob,
-            url: chunkUrl,
-          };
-
-          // Store chunk
-          audioChunksStorageRef.current.push(audioChunk);
-          setRecordedChunks([...audioChunksStorageRef.current]);
-
-          // Process chunk
-          await processAudioChunk(callId, chunkIndexRef.current, chunkBlob, audioChunk);
-          
-          // Reset for next chunk
-          chunkIndexRef.current++;
-          chunkStartTime = Date.now();
-          audioChunksRef.current = [];
-        }
       }
     };
 
-    // Start recording with 1-second timeslice
-    mediaRecorder.start(1000);
-
-    // Set up periodic check
-    chunkTimerRef.current = setInterval(async () => {
-      const elapsed = Date.now() - chunkStartTime;
-      if (elapsed >= CHUNK_DURATION_MS && audioChunksRef.current.length > 0) {
-        const chunkBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+    mediaRecorder.onstop = async () => {
+      // 1. Process the accumulated data from this segment
+      if (audioChunksRef.current.length > 0) {
+        const chunkBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const chunkUrl = URL.createObjectURL(chunkBlob);
-        
+
+        const chunkId = `chunk_${chunkIndexRef.current}_${Date.now()}`;
         const audioChunk: AudioChunk = {
-          id: `chunk_${chunkIndexRef.current}_${Date.now()}`,
+          id: chunkId,
           timestamp: new Date(),
           blob: chunkBlob,
           url: chunkUrl,
         };
 
+        // Update UI immediately
         audioChunksStorageRef.current.push(audioChunk);
         setRecordedChunks([...audioChunksStorageRef.current]);
+
+        // Send to Backend
         await processAudioChunk(callId, chunkIndexRef.current, chunkBlob, audioChunk);
+
         chunkIndexRef.current++;
-        chunkStartTime = Date.now();
-        audioChunksRef.current = [];
+        audioChunksRef.current = []; // Clear for next run
       }
-    }, 1000);
+
+      // 2. Restart if call is still active (indicated by ref existing)
+      if (mediaRecorderRef.current === mediaRecorder && localStreamRef.current) {
+        // Small delay to ensure clean state
+        setTimeout(() => {
+          if (mediaRecorderRef.current === mediaRecorder && mediaRecorder.state === "inactive") {
+            try {
+              mediaRecorder.start();
+              // Schedule next Stop
+              chunkTimerRef.current = setTimeout(() => {
+                if (mediaRecorder.state === "recording") {
+                  mediaRecorder.stop();
+                }
+              }, 10000);
+            } catch (e) {
+              console.error("Failed to restart recorder:", e);
+            }
+          }
+        }, 100);
+      }
+    };
+
+    // Initial Start
+    try {
+      mediaRecorder.start();
+      chunkTimerRef.current = setTimeout(() => {
+        if (mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+        }
+      }, 10000);
+    } catch (e) {
+      console.error("Failed to start recorder:", e);
+    }
   };
 
   const processAudioChunk = async (callId: string, chunkIndex: number, audioBlob: Blob, audioChunk: AudioChunk) => {
@@ -383,7 +390,7 @@ export default function WebRTCCall() {
         isDeepfake: result.is_deepfake,
         confidence: result.confidence,
       };
-      
+
       // Update recorded chunks
       setRecordedChunks([...audioChunksStorageRef.current]);
 
@@ -539,9 +546,8 @@ export default function WebRTCCall() {
           </div>
           <div className="w-full bg-gray-700 h-3 rounded-full overflow-hidden">
             <div
-              className={`h-full transition-all duration-300 ${
-                avgRiskScore >= DEEPFAKE_THRESHOLD ? "bg-red-500" : avgRiskScore >= 0.5 ? "bg-yellow-500" : "bg-green-500"
-              }`}
+              className={`h-full transition-all duration-300 ${avgRiskScore >= DEEPFAKE_THRESHOLD ? "bg-red-500" : avgRiskScore >= 0.5 ? "bg-yellow-500" : "bg-green-500"
+                }`}
               style={{ width: `${Math.min(avgRiskScore * 100, 100)}%` }}
             />
           </div>
@@ -610,7 +616,7 @@ export default function WebRTCCall() {
                 className="flex-1 px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white"
               />
             </div>
-            
+
             {searchResults.length > 0 && (
               <div className="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-600 max-h-48 overflow-y-auto">
                 {searchResults.map((user) => (
@@ -698,26 +704,24 @@ export default function WebRTCCall() {
                 {recordedChunks.map((chunk, idx) => (
                   <div
                     key={chunk.id}
-                    className={`p-3 rounded-lg border ${
-                      chunk.analysis?.isDeepfake && chunk.analysis.confidence >= DEEPFAKE_THRESHOLD
+                    className={`p-3 rounded-lg border ${chunk.analysis?.isDeepfake && chunk.analysis.confidence >= DEEPFAKE_THRESHOLD
                         ? "bg-red-500/20 border-red-500"
                         : chunk.analysis?.isDeepfake
-                        ? "bg-yellow-500/20 border-yellow-500"
-                        : "bg-gray-800 border-gray-600"
-                    }`}
+                          ? "bg-yellow-500/20 border-yellow-500"
+                          : "bg-gray-800 border-gray-600"
+                      }`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-white text-xs font-mono">
                         Chunk {idx + 1}
                       </div>
                       {chunk.analysis ? (
-                        <div className={`text-xs font-bold ${
-                          chunk.analysis.isDeepfake && chunk.analysis.confidence >= DEEPFAKE_THRESHOLD
+                        <div className={`text-xs font-bold ${chunk.analysis.isDeepfake && chunk.analysis.confidence >= DEEPFAKE_THRESHOLD
                             ? "text-red-400"
                             : chunk.analysis.isDeepfake
-                            ? "text-yellow-400"
-                            : "text-green-400"
-                        }`}>
+                              ? "text-yellow-400"
+                              : "text-green-400"
+                          }`}>
                           {(chunk.analysis.confidence * 100).toFixed(0)}%
                         </div>
                       ) : (
@@ -747,11 +751,10 @@ export default function WebRTCCall() {
                 {recentWarnings.slice(-5).map((warning, idx) => (
                   <div
                     key={idx}
-                    className={`p-3 rounded-lg flex items-center gap-2 ${
-                      warning.isDeepfake && warning.confidence >= DEEPFAKE_THRESHOLD
+                    className={`p-3 rounded-lg flex items-center gap-2 ${warning.isDeepfake && warning.confidence >= DEEPFAKE_THRESHOLD
                         ? "bg-red-500/20 border border-red-500"
                         : "bg-gray-800 border border-gray-600"
-                    }`}
+                      }`}
                   >
                     {warning.isDeepfake && warning.confidence >= DEEPFAKE_THRESHOLD ? (
                       <AlertTriangle className="text-red-500 w-5 h-5" />
