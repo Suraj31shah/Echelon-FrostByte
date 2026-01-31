@@ -1,0 +1,29 @@
+--- Real Audio Verification ---
+Model loaded.
+Found 535 files. Testing first 5...
+----------------------------------------
+File: 03a01Fa.wav
+Deepfake Probability: 0.5148
+Classification: Synthetic
+Latency (End-to-End): 4942.92 ms
+--------------------
+File: 03a01Nc.wav
+Deepfake Probability: 0.5149
+Classification: Synthetic
+Latency (End-to-End): 10.70 ms
+--------------------
+File: 03a01Wa.wav
+Deepfake Probability: 0.5148
+Classification: Synthetic
+Latency (End-to-End): 16.72 ms
+--------------------
+File: 03a02Fc.wav
+Deepfake Probability: 0.5149
+Classification: Synthetic
+Latency (End-to-End): 13.50 ms
+--------------------
+File: 03a02Nc.wav
+Deepfake Probability: 0.5149
+Classification: Synthetic
+Latency (End-to-End): 9.44 ms
+--------------------
