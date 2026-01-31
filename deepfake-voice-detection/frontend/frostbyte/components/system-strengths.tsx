@@ -1,8 +1,13 @@
 import { FeatureCard } from "./feature-card";
-import { Clock, Phone, Brain, Zap, Activity, BarChart3 } from "lucide-react";
+import { Clock, Phone, Brain, Zap, Activity, BarChart3, PhoneCall } from "lucide-react";
 
 export function SystemStrengths() {
     const features = [
+        {
+            icon: PhoneCall,
+            title: "Live Call Deepfake Detection",
+            description: "Detects synthetic voices during real phone-to-phone calls in real time."
+        },
         {
             icon: Clock,
             title: "Short Audio Segment",
