@@ -21,6 +21,10 @@ export default function LiveCallStreamer() {
       socketRef.current.onmessage = (event) => {
         const data = JSON.parse(event.data);
         setVerdict(data.label); // "REAL" or "FAKE"
+        // Update status to include source and confidence
+        const src = data.source || "mic";
+        const conf = data.confidence || "?";
+        setStatus(`${src.toUpperCase()} verdict — ${conf}`);
       };
 
       // 2. Access Microphone
@@ -69,9 +73,10 @@ export default function LiveCallStreamer() {
     <div className="p-4 border rounded-lg bg-gray-900 text-white max-w-md mx-auto">
       <h2 className="text-xl font-bold mb-4">Deepfake Voice Guard</h2>
       
-      <div className={`h-24 flex items-center justify-center text-3xl font-bold rounded-md mb-4 
+      <div className={`h-24 flex flex-col items-center justify-center text-3xl font-bold rounded-md mb-2 
         ${verdict === "FAKE" ? "bg-red-600 animate-pulse" : verdict === "REAL" ? "bg-green-600" : "bg-gray-700"}`}>
-        {verdict || "Waiting for Audio..."}
+        <div className="text-3xl">{verdict || "Waiting for Audio..."}</div>
+        <div className="text-xs text-gray-200 mt-1">{status}</div>
       </div>
 
       <div className="text-sm text-gray-400 mb-4">Status: {status}</div>
