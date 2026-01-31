@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0a0f;
+  --foreground: #ededed;
+  
+  /* Cybersecurity Theme Colors */
+  --primary: #00f0ff; /* Cyan for accents/active states */
+  --primary-dim: #00f0ff20;
+  --secondary: #7000ff; /* Purple for depth */
+  --success: #00ff9d; /* Green for Real Voice */
+  --nanger: #ff2a6d; /* Red/Pink for Deepfake */
+  --danger: #ff2a6d;
+  --panel: #12121a; /* Darker panel background */
+  --border: #ffffff15;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-dim: var(--primary-dim);
+  --color-secondary: var(--secondary);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-panel: var(--panel);
+  --color-border: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
