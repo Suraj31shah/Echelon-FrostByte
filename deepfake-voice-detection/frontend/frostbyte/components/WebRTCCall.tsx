@@ -341,7 +341,7 @@ export default function WebRTCCall() {
                 if (mediaRecorder.state === "recording") {
                   mediaRecorder.stop();
                 }
-              }, 10000);
+              }, 4000);
             } catch (e) {
               console.error("Failed to restart recorder:", e);
             }
@@ -357,7 +357,7 @@ export default function WebRTCCall() {
         if (mediaRecorder.state === "recording") {
           mediaRecorder.stop();
         }
-      }, 10000);
+      }, 4000);
     } catch (e) {
       console.error("Failed to start recorder:", e);
     }
@@ -370,6 +370,9 @@ export default function WebRTCCall() {
     try {
       const formData = new FormData();
       formData.append("file", audioBlob, `chunk_${chunkIndex}.webm`);
+      if (callId) {
+        formData.append("call_id", callId);
+      }
 
       // Send to ML service
       const response = await fetch(`${ML_API_URL}/analyze-chunk`, {
@@ -705,10 +708,10 @@ export default function WebRTCCall() {
                   <div
                     key={chunk.id}
                     className={`p-3 rounded-lg border ${chunk.analysis?.isDeepfake && chunk.analysis.confidence >= DEEPFAKE_THRESHOLD
-                        ? "bg-red-500/20 border-red-500"
-                        : chunk.analysis?.isDeepfake
-                          ? "bg-yellow-500/20 border-yellow-500"
-                          : "bg-gray-800 border-gray-600"
+                      ? "bg-red-500/20 border-red-500"
+                      : chunk.analysis?.isDeepfake
+                        ? "bg-yellow-500/20 border-yellow-500"
+                        : "bg-gray-800 border-gray-600"
                       }`}
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -717,10 +720,10 @@ export default function WebRTCCall() {
                       </div>
                       {chunk.analysis ? (
                         <div className={`text-xs font-bold ${chunk.analysis.isDeepfake && chunk.analysis.confidence >= DEEPFAKE_THRESHOLD
-                            ? "text-red-400"
-                            : chunk.analysis.isDeepfake
-                              ? "text-yellow-400"
-                              : "text-green-400"
+                          ? "text-red-400"
+                          : chunk.analysis.isDeepfake
+                            ? "text-yellow-400"
+                            : "text-green-400"
                           }`}>
                           {(chunk.analysis.confidence * 100).toFixed(0)}%
                         </div>
@@ -752,8 +755,8 @@ export default function WebRTCCall() {
                   <div
                     key={idx}
                     className={`p-3 rounded-lg flex items-center gap-2 ${warning.isDeepfake && warning.confidence >= DEEPFAKE_THRESHOLD
-                        ? "bg-red-500/20 border border-red-500"
-                        : "bg-gray-800 border border-gray-600"
+                      ? "bg-red-500/20 border border-red-500"
+                      : "bg-gray-800 border border-gray-600"
                       }`}
                   >
                     {warning.isDeepfake && warning.confidence >= DEEPFAKE_THRESHOLD ? (
